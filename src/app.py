@@ -2,8 +2,6 @@ import time
 import os
 from .presence import Presence
 from .logger import Logger
-from .notifiers.notifier import Notifier
-from .system_tray.system_tray import SystemTray
 from .tab import Tab
 from .operating_systems.operating_system import OperatingSystem
 from .utils import (
@@ -27,71 +25,76 @@ class App:
         "__profileName",
         "refreshRate",
         "useTimeLeft",
-        "showen",
-        "systray",
-        "silent",
         "__operating_system",
-        "notifier",
+        "__browserPath",
     )
 
     def __init__(
         self,
         operating_system: OperatingSystem,
-        notifier: Notifier,
-        systray: SystemTray = None,
-        client_id: str = "",
-        version: str = None,
-        title: str = None,
+        client_id: str,
+        version: str,
+        title: str,
         profileName: str = "Default",
         refreshRate: int = 1,
         useTimeLeft: bool = True,
+        browserPath: str = None,
     ):
-        os.system("title " + title + " v" + version)
-        Logger.write(message=f"{title} v{version}", level="INFO", origin=self)
-        Logger.write(message="initialized, to stop, press CTRL+C.", origin=self)
+        Logger.write(message=f"{title} v{version}", level="INFO")
+        Logger.write(message="initialized, to stop, press CTRL+C.")
         self.__presence = Presence(client_id=client_id)
         self.version = version
         self.title = title
         self.last_tab = None
         self.connected = False
         self.__browser = None
-        self.showen = True
         self.refreshRate = refreshRate
         self.useTimeLeft = useTimeLeft
-        self.silent = False
         self.__profileName = profileName
         self.__operating_system = operating_system
-        self.notifier = notifier
-        self.systray = systray
+        self.__browserPath = browserPath
 
     def __handle_exception(self, exc: Exception) -> None:
-        Logger.write(message=exc, level="ERROR", origin=self)
+        Logger.write(message=str(exc), level="ERROR", origin=self)
 
     def sync(self) -> None:
-        Logger.write(message="syncing..", origin=self)
+        Logger.write(message="syncing..")
         try:
             status = self.__presence.connect()
             if not status:
                 raise Exception("Can't connect to Discord.")
-            self.__browser = self.__operating_system.get_default_browser()
-            if not self.__browser:
-                raise Exception("Can't find default browser in your system.")
-            if not self.__browser["chromium"]:
-                raise Exception("You have an unsupported browser.")
+            if self.__browserPath:
+                import os
+
+                if not os.path.exists(self.__browserPath):
+                    raise Exception(f"Browser path not found: {self.__browserPath}")
+                self.__browser = {
+                    "fullname": os.path.basename(self.__browserPath),
+                    "path": self.__browserPath,
+                }
+                self.__operating_system.browser_path = self.__browserPath
+                self.__operating_system.browser_executable_path = self.__browserPath
+                self.__operating_system.browser_process_name = os.path.basename(
+                    self.__browserPath
+                )
+            else:
+                self.__browser = self.__operating_system.get_default_browser()
+                if not self.__browser:
+                    raise Exception("Can't find default browser in your system.")
             self.connected = True
-            Logger.write(message=f"{self.__browser['fullname']} detected.", origin=self)
+            Logger.write(
+                message=f"Browser: {self.__browser.get('fullname', 'Unknown')}"
+            )
         except Exception as exc:
-            #raise exc
             self.__handle_exception(exc)
 
     def stop(self) -> None:
-        if self.connected == True:
+        if self.connected:
             self.connected = False
-            self.systray.stop()
             self.__presence.close()
-            Logger.write(message="stopped.", origin=self)
-        
-    def update_tabs(self) -> None:
+            Logger.write(message="stopped.")
+
+    def update_tabs(self) -> list:
         tabs = []
         tab_list = get_browser_tabs(filter_url="music.youtube.com")
         if tab_list:
@@ -100,22 +103,6 @@ class App:
                 tab.update()
                 tabs.append(tab)
         return tabs
-
-    def current_playing_tab(self, tabs: list) -> dict:
-        if tabs:
-            for tab in tabs:
-                if tab.playing:
-                    return tab
-            for tab in tabs:
-                if tab.pause:
-                    return tab
-        return None
-
-    def on_quit_callback(self, systray):
-        if self.connected == True:
-            self.connected = False
-            self.__presence.close()
-            Logger.write(message="stopped.", origin=self)
 
     def run(self) -> None:
         last_updated_time: int = 1
@@ -127,33 +114,32 @@ class App:
                 Logger.write(
                     message=f"Detected browser running ({self.__operating_system.get_browser_process_name()}) without remote debugging enabled.",
                     level="WARNING",
-                    origin=self,
                 )
                 raise RuntimeError("Please close all browser instances and try again.")
             if not remote_debugging():
                 Logger.write(
                     message="Remote debugging is not enabled, starting browser..",
                     level="WARNING",
-                    origin=self,
                 )
-                self.__operating_system.run_browser_with_debugging_server(self.__profileName)
+                self.__operating_system.run_browser_with_debugging_server(
+                    self.__profileName
+                )
             else:
                 Logger.write(
-                    message="Remote debugging is enabled, connected successfully.",
-                    origin=self,
+                    message="Remote debugging is enabled, connected successfully."
                 )
-            Logger.write(message="synced and connected.", origin=self)
-            Logger.write(message="Starting presence loop..", origin=self)
+            Logger.write(message="synced and connected.")
+            Logger.write(message="Starting presence loop..")
             time.sleep(3)
             while self.connected:
-                self.silent = False
+                silent = False
                 update_unix_time: float = time.time()
                 tabs = self.update_tabs()
                 tab = [tab for tab in tabs if tab.playing] or [
                     tab for tab in tabs if tab.pause
                 ]
                 if not tab:
-                    Logger.write(message="No tab found.", origin=self)
+                    Logger.write(message="No tab found.")
                     self.__presence.update(
                         details="No activity",
                         large_image="logo",
@@ -170,15 +156,20 @@ class App:
                     continue
                 tab = tab[0]
                 if tab.ad:
-                    Logger.write(message="Ad detected.", origin=self)
+                    Logger.write(message="Ad detected.")
                     time.sleep(DISCORD_STATUS_LIMIT)
                     continue
 
                 if self.last_tab and self.last_tab == tab:
-                    # fixed problem where it didn't detect the page change (appears to happen sometimes in playlists)
-                    delta_estimated_end_times = abs(self.last_tab.projected_end_time - tab.projected_end_time)
-                    playstate_manually_adjusted = delta_estimated_end_times > 1 
-                    self.silent = self.last_tab.projected_end_time + self.refreshRate < update_unix_time or playstate_manually_adjusted
+                    delta_estimated_end_times = abs(
+                        self.last_tab.projected_end_time - tab.projected_end_time
+                    )
+                    playstate_manually_adjusted = delta_estimated_end_times > 1
+                    silent = (
+                        self.last_tab.projected_end_time + self.refreshRate
+                        < update_unix_time
+                        or playstate_manually_adjusted
+                    )
                     if (
                         tab.title == self.last_tab.title
                         and tab.artist == self.last_tab.artist
@@ -190,7 +181,7 @@ class App:
                         continue
 
                 if tab.pause:
-                    self.silent = True
+                    silent = True
 
                 if self.last_tab and self.last_tab.start_time == tab.start_time:
                     time.sleep(self.refreshRate)
@@ -202,25 +193,16 @@ class App:
                         remaining = 1
                     time.sleep(remaining)
                     continue
-                last_updated_time = update_unix_time
+                last_updated_time = int(update_unix_time)
                 self.last_tab = tab
 
                 Logger.write(
                     message=f"Playing {self.last_tab.title} by {self.last_tab.artist}",
-                    origin=self,
-                    silent=self.silent
+                    silent=silent,
                 )
-                
-                if not self.silent and self.notifier is not None:
-                    try:
-                        self.notifier.notify("Now Playing!",
-                                             f"{self.last_tab.title} by {self.last_tab.artist}"
-                                            )
-                    except TypeError:
-                        pass
-                
+
                 self.__presence.update(
-                    silent=self.silent,
+                    silent=silent,
                     details=self.last_tab.title,
                     state=self.last_tab.artist,
                     large_image=self.last_tab.artwork,
@@ -235,15 +217,14 @@ class App:
                         },
                     ],
                     start=self.last_tab.start_time,
-                    end=self.last_tab.projected_end_time + self.refreshRate if self.useTimeLeft else None
+                    end=self.last_tab.projected_end_time + self.refreshRate
+                    if self.useTimeLeft
+                    else None,
                 )
-                # time.sleep(self.refreshRate)
         except Exception as exc:
             self.__handle_exception(exc)
-            # raise exc
             if exc.__class__.__name__ == "URLError":
                 Logger.write(
                     message="Please close all browser instances and try again. Also, close Youtube Music Desktop App if you are using it.",
                     level="WARN",
-                    origin=self,
                 )

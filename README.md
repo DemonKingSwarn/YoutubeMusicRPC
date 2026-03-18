@@ -1,72 +1,60 @@
-> [!IMPORTANT]
-> Unmaintained project, consider using [Rich Presence Plus](https://github.com/manucabral/RichPresencePlus)
+# Youtube Music RPC
 
-<p align="center">
-<img src="https://github.com/manucabral/YoutubeMusicRPC/blob/main/assets/new_logo.png?raw=true" width="250" title="example">
-<img src="https://github.com/manucabral/YoutubeMusicRPC/blob/main/assets/app.png?raw=true" title="app">
-<img src="https://github.com/manucabral/YoutubeMusicRPC/blob/main/assets/listening.png?raw=true" width="400" title="listening">
-<img src="https://github.com/manucabral/YouTubeMusicRPC/blob/main/assets/pause.png?raw=true" width="400" title="pause">
-<img src="https://github.com/manucabral/YouTubeMusicRPC/blob/main/assets/browser.png?raw=true" width="400" title="browser">
-</p>
+A simple terminal-based Discord Rich Presence client for YouTube Music.
 
-<p align="center">
-A YouTube Music Rich Presence app client that shows what you're listening to, made with ❤️.
-</p>
+## Features
 
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/manucabral/YoutubeMusicRPC/total)
+- Displays currently playing track on Discord
+- Shows album artwork, track title, and artist
+- Displays playback state (playing/paused)
+- Shows time remaining or elapsed
+- Supports custom browser paths (AppImages, etc.)
 
-## ⏬ Download
-The lastest release is available [here](https://github.com/manucabral/YoutubeMusicRPC/releases)
+## Requirements
 
-## 🗒️ Supported browsers
-- Google Chrome
-- Yandex Browser
-- Microsoft Edge
-- Opera (Normal, One and GX)
-- Brave Browser
-- Vivaldi Browser
+- Python 3.10+
+- Discord desktop app running
+- Linux
 
-If you want support for another browser, please create an [issue](https://github.com/manucabral/YoutubeMusicRPC/issues).
+## Installation
 
-## 📝Notes
-- Currently only compatible with Microsoft Windows systems.
-- It's recommended to use the system in English, Portuguese, or Spanish because there may be bugs.
+```bash
+pip install -r requirements.txt
+```
 
-## :grey_question: How does that work
-The application opens your browser with remote debugging enabled (Chrome Dev Tools) to access all YouTube Music tabs. Once this is done, the app executes a script to obtain all the data through [MediaSession](https://developer.mozilla.org/en-US/docs/Web/API/MediaSession) and finally creates a Rich Presence for Discord.
+Or with uv:
+```bash
+uv pip install -r requirements.txt
+```
 
-## 🔨 Troubleshooting
-- My Rich Presence client is not displaying.
-  - Try the following:
-    - Go to your User Settings > Activity Status > Display current activity as a status message and make sure it's enabled.
-    - Close the app and wait a few seconds, then open it again.
-- Do I need Discord open on my PC to use this app?
-  - Yes, you need to have Discord open to run the app.
-- The app crashes on startup.
-  - Try the following:
-    - Close all browser instances and run it again.
-    - If you have the YouTube Music Desktop Application open, close it as well. I recommend closing instances from the task manager.
-    - Restart Discord and try opening the app again.
-  - If the problem persists, please create an issue and attach your `client.log` file.
+## Usage
 
-     
-## 🙌 Credits
-- [MediaSession](https://developer.mozilla.org/en-US/docs/Web/API/MediaSession) for accessing media metadata.
-- [pypresence](https://github.com/qwertyquerty/pypresence) for Discord Rich Presence integration.
-- [pybrinf](https://github.com/manucabral/pybrinf) for browser information.
+```bash
+python main.py
+```
 
-## 📜 License & Disclaimer
-This application is not an official product of YouTube or Google and is licensed under the MIT License.
+Or with uv (recommended):
+```bash
+uv run python main.py
+```
 
-## 👥Contributors
+On first run, you'll be prompted to configure:
+- Discord Client ID (or use default)
+- Browser profile name
+- Refresh rate
+- Time display preference
+- Custom browser path (for AppImages or non-standard browser locations)
 
-We would like to thank the following individuals for their contributions to this project:
-- [Shuckes](https://github.com/Shuckes)
-- [Nelly Angels](https://github.com/NellyAngelz)
-- [PickleUpADoodle](https://github.com/PickleUpADoodle)
+Settings are stored in: `~/.config/ytmusic_rpc/settings.json`
 
-## ✨ Contributing
-All contributions, including bug reports, fixes, enhancements, and new ideas are welcome!
-If you want to contribute, simply create a pull request or an issue. We will review your submission and get back to you as soon as possible.
-Thank you for helping to improve the application!
+Press `Ctrl+C` to stop.
+
+## AppImage Browsers
+
+If you're using a browser installed as an AppImage (e.g., Helium), select "yes" when asked for a custom browser path and enter the full path to the AppImage file.
+
+## Notes
+
+- Discord must be running for the presence to work
+- The browser will be launched with remote debugging enabled
+- Close all browser instances before starting if you encounter issues
